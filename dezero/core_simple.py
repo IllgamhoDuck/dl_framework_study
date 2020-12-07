@@ -65,7 +65,7 @@ class Variable:
                 for y in f.outputs:
                     y().grad = None
 
-    def clear_grad(self):
+    def cleargrad(self):
         self.grad = None
 
     def __len__(self):
