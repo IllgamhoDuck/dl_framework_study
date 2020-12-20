@@ -49,8 +49,6 @@ class Variable:
                 gxs = (gxs,)
 
             for x, gx in zip(f.inputs, gxs):
-
-                # TODO : fix grad to be able to accumulate
                 if x.grad is None:
                     x.grad = gx
                 else:
