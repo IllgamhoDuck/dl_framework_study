@@ -133,6 +133,38 @@ def transpose(x, axes=None):
     return Transpose(axes)(x)
 
 
+# slicing
+
+class GetItem(Function):
+    def __init__(self, slices):
+        self.slices = slices
+
+    def forward(self, x):
+        y = x[self.slices]
+        return y
+
+    def backward(self, gy):
+        x, = self.inputs
+        gx = GetItemGrad(self.slices, x.shape)(gy)
+        return gx
+
+def get_item(x, slices):
+    return GetItem(slices)(x)
+
+class GetItemGrad(Function):
+    def __init__(self, slices, in_shape):
+        self.slices = slices
+        self.in_shape = in_shape
+
+    def forward(self, gy):
+        gx = np.zeros(self.in_shape)
+        np.add.at(gx, self.slices, gy)
+        return gx
+
+    def backward(self, ggx):
+        return get_item(ggx, self.slices)
+
+
 # Broadcast
 
 class Sum(Function):
@@ -242,6 +274,12 @@ class MeanSquaredError(Function):
 def mean_squared_error(x0, x1):
     return MeanSquaredError()(x0, x1)
 
+def softmax_simple(x, axis=1):
+    x = as_variable(x)
+    y = exp(x)
+    sum_y = sum(y, axis=axis, keepdims=True)
+    return y / sum_y
+
 
 
 # simplified versions
@@ -258,3 +296,59 @@ def linear_simple(x, W, b=None):
     # to save memory
     t.data = None
     return y
+
+
+# Max / Mix / Clip
+
+class Max(Function):
+    def __init__(self, axis=None, keepdims=False):
+        self.axis = axis
+        self.keepdims = keepdims
+
+    def forward(self, x):
+        y = x.max(axis=self.axis, keepdims=self.keepdims)
+        return y
+
+    def backward(self, gy):
+        x = self.inputs[0]
+        y = self.outputs[0]()
+
+        shape = utils.max_backward_shape(x, self.axis)
+        gy = gy.reshape(shape)
+        y = y.reshape(shape)
+
+        cond = (x.data == y.data)
+        gy = broadcast_to(gy, cond.shape)
+
+        gx = gy * cond
+
+        return gx
+
+class Min(Max):
+    def forward(self, x):
+        y = x.min(axis=self.axis, keepdims=self.keepdims)
+        return y
+
+class Clip(Function):
+    def __init__(self, x_min, x_max):
+        self.x_min = x_min
+        self.x_max = x_max
+
+    def forward(self, x):
+        y = np.clip(x, self.x_min, self.x_max)
+        return y
+
+    def backward(self, gy):
+        x, = self.inputs
+        mask = (x.data >= self.x_min) * (x.data <= self.x_max)
+        gx = gy * mask
+        return gx
+
+def max(x, axis=None, keepdims=False):
+    return Max(axis, keepdims)(x)
+
+def min(x, axis=None, keepdims=False):
+    return Min(axis, keepdims)(x)
+
+def clip(x, x_min, x_max):
+    return Clip(x_min, x_max)(x)
