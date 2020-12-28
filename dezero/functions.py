@@ -271,14 +271,88 @@ class MeanSquaredError(Function):
         gx1 = -gx0
         return gx0, gx1
 
+class Softmax(Function):
+    def __init__(self, axis=1):
+        self.axis = axis
+
+    def forward(self, x):
+        y = x - x.max(axis=self.axis, keepdims=True)
+        y = np.exp(y)
+        y /= y.sum(axis=self.axis, keepdims=True)
+        return y
+
+    def backward(self, gy):
+        y = self.outputs[0]()
+        gx = y * gy
+        sumdx = gx.sum(axis=self.axis, keepdims=True)
+        gx = gx - (y * sumdx)
+        return gx
+
+class SoftmaxCrossEntropy(Function):
+    def forward(self, x, t):
+        N = x.shape[0]
+        log_p = log_softmax(x)
+        log_p = log_p[np.arange(N), t.ravel()]
+        y = -log_p.sum() / np.float32(N)
+        return y
+
+    def backward(self, gy):
+        x, t = self.inputs
+        N, CLS_NUM = x.shape
+
+        gy = gy / N
+
+        # p_i
+        y = softmax(x)
+
+        # t_i
+        t_onehot = np.eye(CLS_NUM, dtype=t.dtype)[t.data]
+
+        # p_i - t_i
+        gx = (y - t_onehot) * gy
+
+        return gx
+
 def mean_squared_error(x0, x1):
     return MeanSquaredError()(x0, x1)
+
+def softmax(x, axis=1):
+    return Softmax(axis)(x)
+
+def softmax_cross_entropy(x, t):
+    return SoftmaxCrossEntropy()(x, t)
+
+def log_softmax(x, axis=1):
+    x_max = x.max(axis=axis, keepdims=True)
+    y = x - x_max
+
+    y = np.exp(y)
+    y_sum = y.sum(axis=axis, keepdims=True)
+
+    log_y_sum = np.log(y_sum)
+    log_z = x_max + log_y_sum
+
+    log_p = x - log_z
+
+    return log_p
+
 
 def softmax_simple(x, axis=1):
     x = as_variable(x)
     y = exp(x)
     sum_y = sum(y, axis=axis, keepdims=True)
     return y / sum_y
+
+def softmax_cross_entropy_simple(x, t):
+    x, t = as_variable(x), as_variable(t)
+    N = x.shape[0]
+
+    p = softmax(x)
+    p = clip(p, 1e-15, 1.0)
+    log_p = log(p)
+    tlog_p = log_p[np.arange(N), t.data]
+    y = -1 * sum(tlog_p) / N
+    return y
 
 
 
