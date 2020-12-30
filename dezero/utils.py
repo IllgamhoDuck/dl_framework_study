@@ -179,3 +179,12 @@ def max_backward_shape(x, axis):
     shape = [s if ax not in axis else 1 for ax, s in enumerate(x.shape)]
 
     return shape
+
+def pair(x):
+    if isinstance(x, int):
+        return (x, x)
+    elif isinstance(x, tuple):
+        assert len(x) == 2
+        return x
+    else:
+        raise ValueError
