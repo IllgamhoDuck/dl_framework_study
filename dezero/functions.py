@@ -254,8 +254,22 @@ class Sigmoid(Function):
         gx = gy * y * (1 - y)
         return gx
 
+class ReLU(Function):
+    def forward(self, x):
+        y = np.maximum(x, 0.0)
+        return y
+
+    def backward(self, gy):
+        x, = self.inputs
+        mask = x.data > 0
+        gx = gy * mask
+        return gx
+
 def sigmoid(x):
     return Sigmoid()(x)
+
+def relu(x):
+    return ReLU()(x)
 
 
 # Loss
