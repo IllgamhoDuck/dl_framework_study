@@ -27,5 +27,6 @@ else:
     import dezero.layers
     import dezero.datasets
     import dezero.transforms
+    import dezero.cuda
 
 setup_variable()

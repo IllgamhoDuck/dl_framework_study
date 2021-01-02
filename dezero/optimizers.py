@@ -2,6 +2,8 @@
 import math
 import numpy as np
 
+from dezero import cuda
+
 class Optimizer:
     """Update the Parameters
 
@@ -51,7 +53,8 @@ class MomentumSGD(Optimizer):
     def update_one(self, param):
         v_key = id(param)
         if v_key not in self.vs:
-            self.vs[v_key] = np.zeros_like(param.data)
+            xp = cuda.get_array_module(param.data)
+            self.vs[v_key] = xp.zeros_like(param.data)
 
         v = self.vs[v_key]
         v *= self.momentum
@@ -67,15 +70,17 @@ class AdaGrad(Optimizer):
         self.hs = {}
 
     def update_one(self, param):
+        xp = cuda.get_array_module(param.data)
+
         h_key = id(param)
         if h_key not in self.hs:
-            self.hs[h_key] = np.zeros_like(param.data)
+            self.hs[h_key] = xp.zeros_like(param.data)
 
         h = self.hs[h_key]
         grad = param.grad.data
 
         h += grad * grad
-        param.data -= self.lr * grad / (np.sqrt(h) + self.eps)
+        param.data -= self.lr * grad / (xp.sqrt(h) + self.eps)
 
 class RMSProp(Optimizer):
     def __init__(self, lr=0.001, rho=0.95, eps=1e-8):
@@ -86,16 +91,18 @@ class RMSProp(Optimizer):
         self.msg = {}
 
     def update_one(self, param):
+        xp = cuda.get_array_module(param.data)
+
         key = id(param)
         if key not in self.msg:
-            self.msg[key] = np.zeros_like(param.data)
+            self.msg[key] = xp.zeros_like(param.data)
 
         msg = self.msg[key]
         grad = param.grad.data
 
         msg *= self.rho
         msg += (1 - self.rho) * grad * grad
-        param.data -= self.lr * grad / (np.sqrt(msg) + self.eps)
+        param.data -= self.lr * grad / (xp.sqrt(msg) + self.eps)
 
 class AdaDelta(Optimizer):
     def __init__(self, lr=0.001, rho=0.95, eps=1e-6):
@@ -107,10 +114,12 @@ class AdaDelta(Optimizer):
         self.msdx = {}
 
     def update_one(self, param):
+        xp = cuda.get_array_module(param.data)
+
         key = id(param)
         if key not in self.msg:
-            self.msg[key] = np.zeros_like(param.data)
-            self.msdx[key] = np.zeros_like(param.data)
+            self.msg[key] = xp.zeros_like(param.data)
+            self.msdx[key] = xp.zeros_like(param.data)
             self.msdx[key] += self.lr
 
         msg, msdx = self.msg[key], self.msdx[key]
@@ -119,7 +128,7 @@ class AdaDelta(Optimizer):
         msg *= self.rho
         msg += (1 - self.rho) * grad * grad
 
-        dx = np.sqrt((msdx + self.eps) / (msg + self.eps)) * grad
+        dx = xp.sqrt((msdx + self.eps) / (msg + self.eps)) * grad
         msdx *= self.rho
         msdx += (1 - self.rho) * dx * dx
 
@@ -147,10 +156,12 @@ class Adam(Optimizer):
         return self.alpha * math.sqrt(fix2) / fix1
 
     def update_one(self, param):
+        xp = cuda.get_array_module(param.data)
+
         key = id(param)
         if key not in self.ms:
-            self.ms[key] = np.zeros_like(param.data)
-            self.vs[key] = np.zeros_like(param.data)
+            self.ms[key] = xp.zeros_like(param.data)
+            self.vs[key] = xp.zeros_like(param.data)
 
         m, v = self.ms[key], self.vs[key]
         beta1, beta2, eps = self.beta1, self.beta2, self.eps
@@ -165,7 +176,7 @@ class Adam(Optimizer):
         m_hat = m / (1 - beta1)
         v_hat = v / (1 - beta2)
 
-        param.data -= self.lr * m_hat / (np.sqrt(v_hat) + eps)
+        param.data -= self.lr * m_hat / (xp.sqrt(v_hat) + eps)
 
 
 class WeightDecay:

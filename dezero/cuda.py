@@ -1,0 +1,44 @@
+
+import numpy as np
+from dezero import Variable
+from dezero import cuda
+
+gpu_enable  = True
+
+try:
+    import cupy as cp
+    cupy = cp
+except ImportError:
+    gpu_enable = False
+
+
+def get_array_module(x):
+    if isinstance(x, Variable):
+        x = x.data
+
+    if not gpu_enable:
+        return np
+
+    xp  = cp.get_array_module(x)
+    return xp
+
+def as_numpy(x):
+    if isinstance(x, Variable):
+        x = x.data
+
+    # This code is necessary when cupy is not installed
+    if np.isscalar(x):
+        return np.array(x)
+    elif isinstance(x, np.ndarray):
+        return x
+
+    return cp.asnumpy(x)
+
+def as_cupy(x):
+    if isinstance(x, Variable):
+        x = x.data
+
+    if not gpu_enable:
+        raise Exception('Cannot load Cupy. Install Cupy.')
+
+    return cp.asarray(x)
