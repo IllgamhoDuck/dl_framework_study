@@ -1,7 +1,6 @@
 
 import numpy as np
 from dezero import Variable
-from dezero import cuda
 
 gpu_enable  = True
 

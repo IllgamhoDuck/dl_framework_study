@@ -4,11 +4,10 @@ import weakref
 import numpy as np
 
 import dezero
-from dezero import cuda
 
 try:
     import cupy
-    array_types = (np.adarray, cupy.ndarray)
+    array_types = (np.ndarray, cupy.ndarray)
 except ImportError:
     array_types = (np.ndarray)
 
@@ -271,27 +270,27 @@ def neg(x):
     return Neg()(x)
 
 def add(x0, x1):
-    x1 = as_array(x1)
+    x1 = as_array(x1, array_module=dezero.cuda.get_array_module(x0.data))
     return Add()(x0, x1)
 
 def sub(x0, x1):
-    x1 = as_array(x1)
+    x1 = as_array(x1, array_module=dezero.cuda.get_array_module(x0.data))
     return Sub()(x0, x1)
 
 def rsub(x0, x1):
-    x1 = as_array(x1)
+    x1 = as_array(x1, array_module=dezero.cuda.get_array_module(x0.data))
     return Sub()(x1, x0)
 
 def mul(x0, x1):
-    x1 = as_array(x1)
+    x1 = as_array(x1, array_module=dezero.cuda.get_array_module(x0.data))
     return Mul()(x0, x1)
 
 def div(x0, x1):
-    x1 = as_array(x1)
+    x1 = as_array(x1, array_module=dezero.cuda.get_array_module(x0.data))
     return Div()(x0, x1)
 
 def rdiv(x0, x1):
-    x1 = as_array(x1)
+    x1 = as_array(x1, array_module=dezero.cuda.get_array_module(x0.data))
     return Div()(x1, x0)
 
 def pow(x, c):
