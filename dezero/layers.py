@@ -1,4 +1,5 @@
 
+import os
 import weakref
 import numpy as np
 
@@ -10,10 +11,13 @@ import dezero.functions as F
 class Layer:
     def __init__(self):
         self._params = set()
+        self.gpu = False
 
     def __setattr__(self, name, value):
         if isinstance(value, (Parameter, Layer)):
             self._params.add(name)
+
+        # adding to __dict__
         super().__setattr__(name, value)
 
     def __call__(self, *inputs):
@@ -43,10 +47,52 @@ class Layer:
     def to_cpu(self):
         for param in self.params():
             param.to_cpu()
+        self.gpu = False
 
     def to_gpu(self):
         for param in self.params():
             param.to_gpu()
+        self.gpu = True
+
+    def _flatten_params(self, params_dict, parent_key=""):
+        for name in self._params:
+            obj = self.__dict__[name]
+            key = parent_key + '/' + name if parent_key else name
+
+            if isinstance(obj, Layer):
+                obj._flatten_params(params_dict, key)
+            else:
+                params_dict[key] = obj
+
+    def save_weights(self, path):
+        # was model using gpu before save?
+        using_gpu = False
+
+        if self.gpu:
+            self.to_cpu()
+            using_gpu = True
+
+        params_dict = {}
+        self._flatten_params(params_dict)
+        array_dict = {key: param.data for key, param in params_dict.items()}
+
+        try:
+            np.savez_compressed(path, **array_dict)
+        except (Exception, KeyboardInterrupt) as e:
+            if os.path.exists(path):
+                os.remove(path)
+            raise
+
+        # if model was using gpu restore it!
+        if using_gpu:
+            self.to_gpu()
+
+    def load_weights(self, path):
+        npz = np.load(path)
+        params_dict = {}
+        self._flatten_params(params_dict)
+        for key, param in params_dict.items():
+            param.data = npz[key]
 
 
 class Linear(Layer):
