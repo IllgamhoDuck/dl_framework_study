@@ -252,6 +252,40 @@ def matmul(x, W):
     return MatMul()(x, W)
 
 
+# Regularization
+
+class Dropout(Function):
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def forward(self, x):
+        if dezero.Config.train:
+            xp = cuda.get_array_module(x)
+
+            mask = xp.random.rand(*x.shape) > self.p
+            scale = xp.array(1.0 - self.p).astype(x.dtype)
+
+            self.mask = mask
+            self.scale = scale
+
+            y = x * mask / scale
+        else:
+            y = x
+
+        return y
+
+    def backward(self, gy):
+        if dezero.Config.train:
+            gx = (gy / self.scale) * self.mask
+        else:
+            gx = gy
+
+        return gx
+
+def dropout(x, p=0.5):
+    return Dropout(p=p)(x)
+
+
 # activation
 
 class Sigmoid(Function):
@@ -413,6 +447,19 @@ def linear_simple(x, W, b=None):
     # to save memory
     t.data = None
     return y
+
+def dropout_simple(x, dropout_ratio=0.5):
+    x = as_variable(x)
+
+    if dezero.Config.train:
+        xp = cuda.get_array_module(x)
+
+        mask = xp.random.rand(*x.shape) > dropout_ratio
+        scale = xp.array(1.0 - dropout_ratio).astype(x.dtype)
+        y = x * mask / scale
+        return y
+    else:
+        return x
 
 
 # Max / Mix / Clip
