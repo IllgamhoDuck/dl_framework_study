@@ -1,7 +1,85 @@
+
 from dezero.utils import pair, get_conv_outsize
 from dezero import cuda
+from dezero import Function
 
 import numpy as np
+
+
+### im2col & col2im
+
+class Im2Col(Function):
+    def __init__(self, kernel_size, stride, pad, to_matrix):
+        super().__init__()
+        self.input_shape = None
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.pad = pad
+        self.to_matrix = to_matrix
+
+    def forward(self, x):
+        self.input_shape = x.shape
+        y = im2col_array(x, self.kernel_size, self.stride, self.pad, self.to_matrix)
+
+        return y
+
+    def backward(self, gy):
+        gx = col2im(gy, self.input_shape, self.kernel_size, self.kernel_size, self.stride,
+                   self.pad, self.to_matrix)
+
+        return gx
+
+class Col2Im(Function):
+    def __init__(self, input_shape, kernel_size, stride, pad, to_matrix):
+        super().__init__()
+        self.input_shape = input_shape
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.pad = pad
+        self.to_matrix = to_matrix
+
+    def forward(self, x):
+        y = col2im_array(x, self.input_shape, self.kernel_size, self.stride,
+                        self.pad, self.to_matrix)
+
+        return y
+
+    def backward(self, gy):
+        gx = im2col(gy, self.kernel_size, self.stride, self.pad, self.to_matrix)
+
+        return gx
+        
+def im2col(x, kernel_size, stride=1, pad=0, to_matrix=True):
+    """Extract patches from an image based on the filter.
+
+    Args:
+        x (`dezero.Variable` or `ndarray`): Input variable of shape
+                `(N, C, H, W)`
+        kernel_size (int or (int, int)): Size of Kernel
+        stride (int or (int, int)): Stride of kernel
+        pad (int or (int, int)): Spatial padding width forinput arrays
+        to_matrix (bool): If True the `col` will be reshaped to 2d array whose
+                shape is `(N*OH*OW, C*KH*KW)`
+
+    Returns:
+        `dezero.Variable`: Output variable. If the `to_matrix` is False, the
+                output shape is `(N, C, KH, KW, OH, OW)`, otherwise
+                `(N*OH*OW, C*KH*KW)`
+
+    Notation:
+        - `N` is the batch size
+        - `C` is the number of the input channels
+        - `H` and `W` are the height and width of the input image, respectively
+        - `KH` and `KW` are the height and width of the filters, respectively
+        - `SH` and `SW` are the strides of the filter
+        - `PH` and `PW` are the spatial padding sizes
+        - `OH` and `OW` are the height and width of the output, respectively
+    """
+    y = Im2Col(kernel_size, stride, pad, to_matrix)(x)
+    return y
+
+def col2im(x, input_shape, kernel_size, stride=1, pad=0, to_matrix=True):
+    return Col2Im(input_shape, kernel_size, stride, pad, to_matrix)(x)
 
 
 ### Numpy im2col & col2im
@@ -21,13 +99,13 @@ def im2col_array(img, kernel_size, stride, pad, to_matrix=True):
     else:
         img = np.pad(img,
                     ((0, 0),  (0, 0), (PH, PH + SH - 1), (PW, PW + SW - 1)),
-                    mode = 'constant', constant_value=(0,))
+                    mode='constant', constant_values=(0,))
         col = np.ndarray((N, C, KH, KW, OH, OW), dtype=img.dtype)
 
         for j in range(KH):
             j_lim = j + SH * OH
             for i in range(KW):
-                i_lin = i + SW * OW
+                i_lim = i + SW * OW
                 col[:, :, j, i, :, :] = img[:, :, j:j_lim:SH, i:i_lim:SW]
 
     if to_matrix:
